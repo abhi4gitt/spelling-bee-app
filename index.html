@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Spelling Bee - Honeycomb Puzzle</title>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <style>
+    :root {
+      --primary-center: #f7da21;
+      --primary-center-text: #1a1a1a;
+      --outer-hex-color: #e6e6e6;
+      --outer-hex-text: #1a1a1a;
+      --bg-color: #fbfbfb;
+      --card-bg: #ffffff;
+      --text-main: #1a1a1a;
+      --text-muted: #6b7280;
+      --border-color: #e5e7eb;
+      --toast-bg: #1a1a1a;
+      --toast-text: #ffffff;
+      --modal-bg: #ffffff;
+      --modal-overlay: rgba(0, 0, 0, 0.55);
+    }
+    [data-theme="dark"] {
+      --bg-color: #121212;
+      --card-bg: #1e1e1e;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border-color: #374151;
+      --toast-bg: #f3f4f6;
+      --toast-text: #121212;
+      --modal-bg: #1e1e1e;
+      --modal-overlay: rgba(0, 0, 0, 0.75);
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    header {
+      width: 100%;
+      background-color: var(--primary-center);
+      color: var(--primary-center-text);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .brand { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 1.15rem; letter-spacing: -0.5px; user-select: none; }
+    .brand svg { width: 24px; height: 24px; }
+    .daily-badge { min-height: 44px; font-size: 0.8rem; font-weight: 700; background: rgba(0, 0, 0, 0.12); padding: 4px 10px; border-radius: 14px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 4px; }
+    .daily-badge:hover { background: rgba(0, 0, 0, 0.2); }
+    .header-right { display: flex; align-items: center; gap: 4px; }
+    .icon-btn { background: transparent; border: none; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: inherit; transition: background-color 0.15s ease; }
+    .icon-btn:hover { background: rgba(0, 0, 0, 0.12); }
+    .icon-btn svg { width: 20px; height: 20px; }
+    main { width: 100%; max-width: 520px; padding: 16px; display: flex; flex-direction: column; align-items: center; flex: 1; }
+    .rank-progress-container { width: 100%; margin-bottom: 12px; }
+    .rank-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+    .rank-title { font-size: 1.1rem; font-weight: 800; }
+    .rank-next { font-size: 0.8rem; color: var(--text-muted); }
+    .words-current { font-size: 0.95rem; font-weight: 700; }
+    .possible-words-count { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; }
+    .possible-words-count span { color: var(--text-muted); font-weight: 600; }
+    .progress-bar-wrapper { position: relative; width: 100%; height: 12px; background: var(--border-color); border-radius: 6px; display: flex; align-items: center; margin: 8px 0; }
+    .progress-fill { height: 100%; background-color: var(--primary-center); border-radius: 6px; transition: width 0.3s ease, background-color 0.3s ease; width: 0%; }
+    .progress-milestones { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; pointer-events: none; }
+    .milestone-dot { position: absolute; top: 50%; width: 8px; height: 8px; border-radius: 50%; background: #ffffff; border: 1.5px solid #9ca3af; transform: translate(-50%, -50%); transition: all 0.2s ease; }
+    .milestone-dot.active { background: var(--primary-center); border-color: #1a1a1a; transform: translate(-50%, -50%) scale(1.25); }
+    .progress-labels { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); font-weight: 700; }
+    .word-list-accordion { width: 100%; border: 1px solid var(--border-color); border-radius: 10px; background: var(--card-bg); margin-bottom: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+    .accordion-header { min-height: 44px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; font-size: 0.9rem; font-weight: 700; }
+    .accordion-header span:first-child { color: var(--text-muted); }
+    .accordion-chevron { transition: transform 0.2s ease; width: 16px; height: 16px; }
+    .accordion-chevron.open { transform: rotate(180deg); }
+    .accordion-content { max-height: 0; overflow-y: auto; transition: max-height 0.3s ease-out; background: var(--card-bg); }
+    .accordion-content.open { max-height: 200px; border-top: 1px solid var(--border-color); padding: 12px; }
+    .words-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 100px), 1fr)); gap: 8px; }
+    .found-word-pill { font-size: 0.85rem; font-weight: 600; text-transform: capitalize; cursor: pointer; padding: 6px 10px; border-radius: 6px; background: rgba(0, 0, 0, 0.04); border: 1px solid transparent; display: flex; align-items: center; justify-content: space-between; transition: all 0.15s ease; user-select: none; }
+    [data-theme="dark"] .found-word-pill { background: rgba(255, 255, 255, 0.06); }
+    .found-word-pill:hover { border-color: var(--primary-center); background: rgba(247, 218, 33, 0.2); transform: translateY(-1px); }
+    .found-word-pill.is-pangram { font-weight: 800; color: #b58900; }
+    [data-theme="dark"] .found-word-pill.is-pangram { color: #f7da21; }
+    .input-stage { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; position: relative; }
+    .input-letters { max-width: 100%; font-size: clamp(1.5rem, 8vw, 2.1rem); font-weight: 800; letter-spacing: clamp(1px, 0.5vw, 2px); text-transform: uppercase; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; overflow-wrap: anywhere; }
+    .input-letter.is-center { color: var(--primary-center); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3)); }
+    .blinking-cursor { display: inline-block; width: 3px; height: 2.1rem; background-color: var(--primary-center); margin-left: 3px; animation: blink 1s step-end infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    .shake { animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+    @keyframes shake { 10%, 90% { transform: translate3d(-2px, 0, 0); } 20%, 80% { transform: translate3d(4px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-6px, 0, 0); } 40%, 60% { transform: translate3d(6px, 0, 0); } }
+    .toast-container { position: absolute; top: -38px; display: flex; justify-content: center; pointer-events: none; z-index: 20; }
+    .toast { background: var(--toast-bg); color: var(--toast-text); font-size: 0.85rem; font-weight: 700; padding: 6px 14px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: toastPop 0.2s ease-out; }
+    @keyframes toastPop { 0% { transform: scale(0.7); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .honeycomb-svg-wrap { width: 100%; max-width: 320px; height: auto; max-height: min(290px, 42dvh); aspect-ratio: 10 / 9; margin-bottom: 16px; user-select: none; display: flex; align-items: center; justify-content: center; }
+    .honeycomb-svg { width: 100%; height: 100%; overflow: visible; }
+    .hex-cell { cursor: pointer; outline: none; }
+    .hex-polygon { stroke: none; transition: fill 0.2s ease, transform 0.1s ease; transform-origin: center; }
+    .hex-polygon-center { fill: var(--primary-center); }
+    .hex-polygon-outer { fill: var(--outer-hex-color); }
+    .hex-cell:hover .hex-polygon-outer { filter: brightness(0.93); }
+    .hex-cell:hover .hex-polygon-center { filter: brightness(0.93); }
+    .hex-cell:active .hex-polygon { transform: scale(0.94); }
+    .hex-text { font-size: 32px; font-weight: 800; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; font-family: inherit; }
+    .hex-text-center { fill: var(--primary-center-text); }
+    .hex-text-outer { fill: var(--outer-hex-text); }
+    .actions-bar { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; margin-bottom: 16px; }
+    .action-pill-btn { min-height: 46px; padding: 12px 24px; font-size: 0.95rem; font-weight: 700; border-radius: 28px; cursor: pointer; transition: all 0.15s ease; user-select: none; border: 1px solid var(--border-color); }
+    .btn-delete { background: var(--card-bg); color: var(--text-main); }
+    .btn-delete:hover { background: var(--border-color); }
+    .btn-enter { background: #1a1a1a; color: #ffffff; border-color: #1a1a1a; }
+    [data-theme="dark"] .btn-enter { background: #ffffff; color: #121212; border-color: #ffffff; }
+    .btn-enter:hover { opacity: 0.88; }
+    .action-circle-btn { width: 46px; height: 46px; border-radius: 50%; background: var(--card-bg); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-main); transition: transform 0.15s ease, background 0.15s ease; }
+    .action-circle-btn:hover { background: var(--border-color); }
+    .action-circle-btn:active { transform: scale(0.92); }
+    .action-circle-btn svg { width: 22px; height: 22px; }
+    .btn-share { width: 100%; max-width: 280px; background: var(--primary-center); color: var(--primary-center-text); font-size: 0.95rem; font-weight: 700; padding: 12px; border: none; border-radius: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: filter 0.15s ease, transform 0.1s ease; }
+    .btn-share:hover { filter: brightness(0.92); }
+    .btn-share:active { transform: scale(0.97); }
+    .modal-backdrop { position: fixed; inset: 0; width: 100%; height: 100%; height: 100dvh; background: var(--modal-overlay); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; visibility: hidden; transition: opacity 0.2s ease, visibility 0.2s ease; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+    .modal-backdrop.open { opacity: 1; visibility: visible; }
+    .modal-window { background: var(--modal-bg); color: var(--text-main); width: 100%; max-width: 480px; border-radius: 16px; padding: 22px 24px; box-shadow: 0 12px 36px rgba(0,0,0,0.3); max-height: 85vh; max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; transform: scale(0.95); transition: transform 0.2s ease; }
+    .modal-backdrop.open .modal-window { transform: scale(1); }
+    .modal-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .modal-title { font-size: 1.25rem; font-weight: 800; }
+    .modal-close-btn { width: 44px; height: 44px; flex: 0 0 44px; background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); line-height: 1; }
+    .modal-close-btn:hover { color: var(--text-main); }
+    .def-word-title { font-size: 1.5rem; font-weight: 800; text-transform: capitalize; margin-bottom: 4px; }
+    .def-phonetic { color: var(--text-muted); font-style: italic; margin-bottom: 14px; font-size: 0.9rem; }
+    .def-item { margin-bottom: 12px; border-left: 3px solid var(--primary-center); padding-left: 10px; }
+    .def-pos { font-size: 0.8rem; text-transform: uppercase; font-weight: 800; color: #b58900; }
+    .def-text { font-size: 0.92rem; margin: 4px 0; line-height: 1.45; }
+    .def-example { font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
+    .palette-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px; }
+    .palette-card { border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: border-color 0.2s ease, transform 0.1s ease; }
+    .palette-card:hover { border-color: var(--primary-center); transform: translateY(-1px); }
+    .palette-preview { width: 32px; height: 32px; border-radius: 50%; position: relative; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; }
+    .palette-preview-inner { position: absolute; width: 16px; height: 16px; top: 8px; left: 8px; border-radius: 50%; }
+    .palette-info { font-size: 0.85rem; font-weight: 700; }
+    .custom-color-pickers { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 14px; }
+    .picker-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem; font-weight: 600; }
+    .picker-row input[type="color"] { border: none; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; background: transparent; }
+    .matrix-table-wrap { overflow-x: auto; margin: 14px 0; }
+    .matrix-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; }
+    .matrix-table th, .matrix-table td { border: 1px solid var(--border-color); padding: 6px 8px; }
+    .matrix-table th { background: rgba(0,0,0,0.04); font-weight: 700; }
+    .two-letter-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .two-letter-pill { font-size: 0.8rem; background: rgba(0,0,0,0.04); border: 1px solid var(--border-color); border-radius: 6px; padding: 3px 7px; font-family: monospace; font-weight: 700; }
+    .summary-card-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+    .sum-card { background: rgba(0,0,0,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; text-align: center; }
+    .sum-card .num { font-size: 1.25rem; font-weight: 800; color: var(--primary-center); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2)); }
+    .sum-card .lbl { font-size: 0.75rem; color: var(--text-muted); }
+    @media (max-width: 520px) {
+      header { flex-wrap: wrap; gap: 6px; padding-top: max(8px, env(safe-area-inset-top)); }
+      .header-left, .header-right { width: 100%; justify-content: space-between; }
+      .header-right { gap: 0; }
+      .brand { font-size: 1.05rem; }
+      main { padding: 14px max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+      .honeycomb-svg-wrap { max-width: min(320px, 84vw); max-height: min(290px, 40dvh); }
+      .actions-bar { gap: clamp(6px, 2.5vw, 12px); }
+      .action-pill-btn { padding-right: clamp(12px, 4vw, 24px); padding-left: clamp(12px, 4vw, 24px); }
+      .action-circle-btn { width: 46px; height: 46px; flex: 0 0 46px; }
+      .btn-share { min-height: 46px; }
+      .modal-window { padding: 18px 16px; }
+      .palette-grid { grid-template-columns: 1fr; }
+    }
+    @media (min-width: 700px) and (orientation: portrait) {
+      main { max-width: 680px; padding: 24px; }
+      .honeycomb-svg-wrap { max-width: 380px; max-height: min(360px, 42dvh); }
+      .words-grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+    }
+    @media (orientation: landscape) and (min-width: 480px) and (max-height: 600px) {
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(200px, 0.9fr);
+        grid-template-areas:
+          "rank honeycomb"
+          "wordlist honeycomb"
+          "input honeycomb"
+          "actions actions"
+          "share share";
+        align-content: start;
+        align-items: center;
+        column-gap: 24px;
+        max-width: 900px;
+        padding: 10px 20px max(12px, env(safe-area-inset-bottom));
+      }
+      .rank-progress-container { grid-area: rank; align-self: end; }
+      .word-list-accordion { grid-area: wordlist; margin-bottom: 8px; }
+      .input-stage { grid-area: input; margin-bottom: 8px; }
+      .honeycomb-svg-wrap { grid-area: honeycomb; width: min(100%, 320px); max-height: 68dvh; margin: 0 auto; }
+      .actions-bar { grid-area: actions; margin: 4px 0 8px; }
+      .btn-share { grid-area: share; justify-self: center; min-height: 44px; padding: 9px 12px; }
+      header { padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: 6px; }
+    }
+    @media (max-height: 420px) {
+      .honeycomb-svg-wrap { max-height: 52dvh; }
+      .word-list-accordion { margin-bottom: 8px; }
+      .accordion-content.open { max-height: 120px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header id="mainHeader">
+    <div class="header-left">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 7v10l8 5 8-5V7l-8-5zm0 2.2l6 3.75v7.5l-6 3.75-6-3.75v-7.5l6-3.75zM12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+        <span>Spelling Bee</span>
+      </div>
+      <div class="daily-badge" id="modeBadgeBtn" title="Toggle Daily / Random Puzzle">
+        <span id="modeBadgeText">Daily Hive</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="icon-btn" id="newRandomGameBtn" title="Generate Fresh Random 26-Letter Puzzle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      </button>
+      <button class="icon-btn" id="paletteBtn" title="Theme Customizer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
+          <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="themeToggleBtn" title="Dark / Light Mode">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
+      <button class="icon-btn" id="helpBtn" title="How to Play">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </button>
+    </div>
+  </header>
+  <main>
+    <div class="rank-progress-container">
+      <div class="possible-words-count">Possible words: <span id="possibleWordsLabel">0</span></div>
+      <div class="rank-header">
+        <div class="rank-title" id="currentRankLabel">Beginner</div>
+        <div class="words-current">Words: <span id="foundWordsCountLabel">0</span></div>
+      </div>
+      <div class="rank-next" id="rankNextLabel">Loading word ranks...</div>
+      <div class="progress-bar-wrapper">
+        <div class="progress-fill" id="progressFill"></div>
+        <div class="progress-milestones" id="progressMilestones"></div>
+      </div>
+      <div class="progress-labels"><span>0</span><span id="maxWordsLabel">0</span></div>
+    </div>
+    <div class="word-list-accordion">
+      <div class="accordion-header" id="accordionToggle">
+        <span id="accordionSummaryText">Your words (0)...</span>
+        <svg class="accordion-chevron" id="accordionChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="accordion-content" id="accordionContent">
+        <div class="words-grid" id="wordsGrid"></div>
+      </div>
+    </div>
+    <div class="input-stage">
+      <div class="toast-container" id="toastContainer"></div>
+      <div class="input-letters" id="inputLetters"><span class="blinking-cursor"></span></div>
+    </div>
+    <div class="honeycomb-svg-wrap">
+      <svg class="honeycomb-svg" viewBox="0 0 300 270">
+        <g class="hex-cell" id="hex0" data-idx="0">
+          <polygon class="hex-polygon hex-polygon-outer" points="103,15 148,41 148,93 103,119 58,93 58,41" />
+          <text class="hex-text hex-text-outer" x="103" y="67"></text>
+        </g>
+        <g class="hex-cell" id="hex1" data-idx="1">
+          <polygon class="hex-polygon hex-polygon-outer" points="197,15 242,41 242,93 197,119 152,93 152,41" />
+          <text class="hex-text hex-text-outer" x="197" y="67"></text>
+        </g>
+        <g class="hex-cell" id="hex2" data-idx="2">
+          <polygon class="hex-polygon hex-polygon-outer" points="244,95 289,121 289,173 244,199 199,173 199,121" />
+          <text class="hex-text hex-text-outer" x="244" y="147"></text>
+        </g>
+        <g class="hex-cell" id="hex3" data-idx="3">
+          <polygon class="hex-polygon hex-polygon-outer" points="197,175 242,201 242,253 197,279 152,253 152,201" />
+          <text class="hex-text hex-text-outer" x="197" y="227"></text>
+        </g>
+        <g class="hex-cell" id="hex4" data-idx="4">
+          <polygon class="hex-polygon hex-polygon-outer" points="103,175 148,201 148,253 103,279 58,253 58,201" />
+          <text class="hex-text hex-text-outer" x="103" y="227"></text>
+        </g>
+        <g class="hex-cell" id="hex5" data-idx="5">
+          <polygon class="hex-polygon hex-polygon-outer" points="56,95 101,121 101,173 56,199 11,173 11,121" />
+          <text class="hex-text hex-text-outer" x="56" y="147"></text>
+        </g>
+        <g class="hex-cell" id="hexCenter" data-idx="center">
+          <polygon class="hex-polygon hex-polygon-center" points="150,95 195,121 195,173 150,199 105,173 105,121" />
+          <text class="hex-text hex-text-center" x="150" y="147"></text>
+        </g>
+      </svg>
+    </div>
+    <div class="actions-bar">
+      <button class="action-pill-btn btn-delete" id="deleteBtn">Delete</button>
+      <button class="action-circle-btn" id="hintBtn" title="Hint Matrix">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6m-5 4h4m-2-20a7 7 0 00-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 001 1h6a1 1 0 001-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 00-7-7z"/></svg>
+      </button>
+      <button class="action-circle-btn" id="shuffleBtn" title="Shuffle Outer Letters">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+      </button>
+      <button class="action-pill-btn btn-enter" id="enterBtn">Enter</button>
+    </div>
+    <button class="btn-share" id="shareProgressBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8m12-6L12 2 8 6m4-4v13"/></svg>
+      <span>Share your progress</span>
+    </button>
+  </main>
+  <div class="modal-backdrop" id="defModal">
+    <div class="modal-window">
+      <div class="modal-top">
+        <span class="modal-title">Word Definition</span>
+        <button class="modal-close-btn" data-close="defModal">&times;</button>
+      </div>
+      <div id="defContent"></div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="themeModal">
+    <div class="modal-window">
+      <div class="modal-top">
+        <span class="modal-title">Honeycomb Themes</span>
+        <button class="modal-close-btn" data-close="themeModal">&times;</button>
+      </div>
+      <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">Choose a handcrafted palette or customize colors directly:</div>
+      <div class="palette-grid" id="paletteGrid"></div>
+      <div class="custom-color-pickers">
+        <div class="picker-row"><span>Center Hexagon Color:</span><input type="color" id="centerColorPicker" value="#f7da21"></div>
+        <div class="picker-row"><span>6 Outer Shells Color:</span><input type="color" id="outerColorPicker" value="#e6e6e6"></div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="hintModal">
+    <div class="modal-window">
+      <div class="modal-top">
+        <span class="modal-title">Smart Hint Matrix</span>
+        <button class="modal-close-btn" data-close="hintModal">&times;</button>
+      </div>
+      <div class="summary-card-row">
+        <div class="sum-card"><div class="num" id="hintWordsLeft">0</div><div class="lbl">Words Left</div></div>
+        <div class="sum-card"><div class="num" id="hintPangramsLeft">0</div><div class="lbl">Pangrams Left</div></div>
+      </div>
+      <div class="matrix-table-wrap"><table class="matrix-table" id="matrixTable"></table></div>
+      <div style="font-weight: 700; font-size: 0.85rem; margin-top: 10px;">Two-Letter List:</div>
+      <div class="two-letter-tags" id="twoLetterTags"></div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="helpModal">
+    <div class="modal-window">
+      <div class="modal-top">
+        <span class="modal-title">How to Play</span>
+        <button class="modal-close-btn" data-close="helpModal">&times;</button>
+      </div>
+      <div style="font-size: 0.9rem; line-height: 1.5;">
+        <p style="margin-bottom: 10px;">Construct words using letters from the honeycomb.</p>
+        <ul style="margin-left: 20px; margin-bottom: 12px;">
+          <li>Words must be <strong>at least 4 letters</strong>.</li>
+          <li>Words <strong>MUST include the center letter</strong>.</li>
+          <li>Letters may be used <strong>multiple times</strong>.</li>
+        </ul>
+        <h4 style="margin: 10px 0 4px;">Word ranks:</h4>
+        <ul style="margin-left: 20px; margin-bottom: 12px;">
+          <li>Your rank is based on the number of possible words you find.</li>
+          <li>Find more words to progress through Beginner, Novice, Okay, Good, Solid, Nice, Great, Amazing, and Genius.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <script>
+    const BASE_CORE_WORDS = [
+      "CATTLE", "BEE", "HONEY", "COMB", "OUTPACE", "COPE", "CAPE", "CAPO", "CAPOTE", "CAPUT",
+      "COOP", "COOPT", "COPT", "COPTOUT", "COUP", "COUPE", "CUTUP", "EPAT", "OCTOPE", "OUTPOP",
+      "PACE", "PACT", "PAPA", "PAPETTE", "PATE", "PATEE", "PATO", "PATOOT", "PEAT", "PEEP",
+      "PEPO", "PETAP", "PETCOAT", "PETT", "PETTO", "POCO", "POET", "POOP", "POOT", "POPE",
+      "POPOTE", "POPOUT", "POTA", "POTAE", "POTATO", "POTATOE", "POTO", "POTT", "POTTO", "POUT",
+      "PUPA", "PUPAE", "PUPATE", "PUPPET", "PUTT", "TAPE", "TEACUP", "TEAPOT", "TOPCOAT", "TOPE",
+      "TOPO", "TACT", "TACTILE", "TALC", "LATE", "LATER", "ALTER", "ALERT", "TRACE", "CRATE",
+      "CATER", "REACT", "CLEAR", "CLEAN", "CENTRAL", "LANCE", "CLAN", "RELATE", "TELLER", "CREATE",
+      "CANCER", "CANTER", "CARE", "CARET", "CART", "CELL", "CELLAR", "CLARET", "CLEANER", "RECANT",
+      "CALL", "CANE", "CANT", "CENT", "CENTER", "ECLAT", "ABOUT", "ABOVE", "ACTION", "ACTIVE",
+      "ACTOR", "ADAPT", "ADMIT", "ADOPT", "AFTER", "AGAIN", "AGENT", "AGREE", "AHEAD", "ALARM",
+      "ALBUM", "ALIEN", "ALIGN", "ALIKE", "ALIVE", "ALLOW", "ALONE", "ALONG", "ALPHA", "ANGER",
+      "ANGLE", "ANGRY", "APART", "APPLE", "APPLY", "ARENA", "ARGUE", "ARISE", "ARMOR", "ARROW",
+      "ASSET", "AUDIO", "AUDIT", "AVOID", "AWAIT", "AWAKE", "AWARD", "AWARE", "BADGE", "BAKER",
+      "BASIC", "BEACH", "BEGAN", "BEGIN", "BEING", "BELOW", "BENCH", "BERRY", "BIRTH", "BLACK",
+      "BLADE", "BLAME", "BLANK", "BLAST", "BLEND", "BLESS", "BLIND", "BLOCK", "BLOOD", "BLOOM",
+      "BOARD", "BOAST", "BONUS", "BOOST", "BOOTH", "BOUND", "BRAIN", "BRAKE", "BRAND", "BRASS",
+      "BRAVE", "BREAD", "BREAK", "BREED", "BRIEF", "BRING", "BROAD", "BROKE", "BROWN", "BRUSH",
+      "BUILD", "BUILT", "BUNCH", "BURST", "CABIN", "CABLE", "CAMEL", "CANAL", "CANDY", "CANOE",
+      "CARGO", "CARRY", "CATCH", "CAUSE", "CHAIN", "CHAIR", "CHALK", "CHAMP", "CHANCE", "CHANGE",
+      "CHANNEL", "CHAOS", "CHARGE", "CHARM", "CHART", "CHASE", "CHEAP", "CHECK", "CHEEK", "CHEER",
+      "CHEF", "CHILL", "CHIP", "CHOICE", "CHOOSE", "CIVIC", "CIVIL", "CLAIM", "CLAMP", "CLASS",
+      "CLAW", "CLAY", "CLERK", "CLICK", "CLIFF", "CLIMB", "CLOAK", "CLOCK", "CLONE", "CLOSE",
+      "CLOTH", "CLOUD", "CLOWN", "CLUB", "CLUE", "COACH", "COAL", "COAST", "COAT", "COBRA",
+      "COFFEE", "COIN", "COLD", "COLLAR", "COLON", "COLOR", "COLUMN", "COMET", "COMIC", "COMMON",
+      "CORAL", "CORD", "CORE", "CORK", "CORN", "CORNER", "COST", "COTTON", "COUNT", "COURT",
+      "COVER", "CRACK", "CRAFT", "CRANE", "CRASH", "CRAWL", "CRAZY", "CREAM", "CREEK", "CREEP",
+      "CREW", "CRIME", "CRISP", "CROSS", "CROWD", "CROWN", "CRUDE", "CRUEL", "CRUSH", "CRUST",
+      "CRYSTAL", "CUBE", "CULTURE", "CURE", "CURL", "CURSE", "CURVE", "CYCLE", "DAILY", "DANCE",
+      "DANGER", "DRAFT", "DRAIN", "DRAMA", "DREAM", "DRIFT", "DRILL", "DRINK", "DRIVE", "DRONE",
+      "EAGLE", "EARLY", "EARTH", "ECHO", "EDITION", "ELDER", "ELECT", "ELITE", "EMPTY", "ENEMY",
+      "ENJOY", "ENTER", "ENTRY", "EQUAL", "EQUIP", "ERROR", "EVENT", "EVERY", "EXACT", "EXCEL",
+      "EXIST", "EXTRA", "FAINT", "FAITH", "FALSE", "FANCY", "FATAL", "FAULT", "FAVOR", "FEAST",
+      "FIBER", "FIELD", "FIGHT", "FINAL", "FIRST", "FLAME", "FLASH", "FLEET", "FLESH", "FLOAT",
+      "FLOOD", "FLOOR", "FLOUR", "FLUID", "FOCUS", "FORCE", "FORTH", "FORTY", "FORUM", "FOUND",
+      "FRAME", "FRANK", "FRAUD", "FRESH", "FRONT", "FROST", "FRUIT", "GIANT", "GIVEN", "GLANCE",
+      "GLASS", "GLOBE", "GLORY", "GLOVE", "GRACE", "GRADE", "GRAIN", "GRAND", "GRANT", "GRAPE",
+      "GRAPH", "GRASP", "GRASS", "GRAVE", "GREAT", "GREET", "GRIEF", "GILL", "GRIND", "GROSS",
+      "GROUP", "GROVE", "GUARD", "GUESS", "GUEST", "GUIDE", "HABIT", "HAPPY", "HARSH", "HEADING",
+      "HEART", "HEAVY", "HONOR", "HORSE", "HOTEL", "HOUSE", "HUMAN", "HUMOR", "IDEAL", "IMAGE",
+      "INDEX", "INNER", "INPUT", "ISSUE", "JEWEL", "JOINT", "JUDGE", "JUICE", "KNIFE", "KNOCK",
+      "LABEL", "LABOR", "LARGE", "LASER", "LAUGH", "LAYER", "LEARN", "LEASE", "LEAST", "LEAVE",
+      "LEGAL", "LEMON", "LEVEL", "LEVER", "LIGHT", "LIMIT", "LINEN", "LOCAL", "LOGIC", "LOOSE",
+      "LOVER", "LOWER", "LUCKY", "LUNCH", "MAGIC", "MAJOR", "MAKER", "MARCH", "MATCH", "MAYOR",
+      "MEDAL", "MEDIA", "MERIT", "METAL", "METER", "MICRO", "MIDST", "MIGHT", "MINOR", "MINUS",
+      "MIXER", "MODEL", "MODEM", "MONEY", "MONTH", "MORAL", "MOTOR", "MOUNT", "MOUSE", "MOUTH",
+      "MOVIE", "MUSIC", "NAIVE", "NERVE", "NOBLE", "NOISE", "NORTH", "NOVEL", "NURSE", "OCEAN",
+      "OFFER", "OFTEN", "ONSET", "OPERA", "OPTIC", "ORBIT", "ORDER", "ORGAN", "OTHER", "OUGHT",
+      "OUTER", "OWNER", "OXIDE", "PANEL", "PANIC", "PAPER", "PARTY", "PATCH", "PAUSE", "PEACE",
+      "PEACH", "PEARL", "PEDAL", "PHASE", "PHONE", "PHOTO", "PIANO", "PIECE", "PILOT", "PITCH",
+      "PIVOT", "PIXEL", "PIZZA", "PLACE", "PLAIN", "PLANE", "PLANT", "PLATE", "PLAZA", "POINT",
+      "POLAR", "POUND", "POWER", "PRICE", "PRIDE", "PRIME", "PRINT", "PRIOR", "PRIZE", "PROBE",
+      "PROUD", "PROVE", "PULSE", "PUNCH", "PUPIL", "PURSE", "QUEEN", "QUERY", "QUEST", "QUICK",
+      "QUIET", "QUITE", "QUOTA", "RADAR", "RADIO", "RAISE", "RALLY", "RANCH", "RANGE", "RAPID",
+      "RATIO", "REACH", "READY", "REALM", "REBEL", "REFER", "REIGN", "RELAX", "RENEW", "REPLY",
+      "RESET", "RIDER", "RIDGE", "RIFLE", "RIGHT", "RIVAL", "RIVER", "ROBOT", "ROCKY", "ROGER",
+      "ROMAN", "ROUGH", "ROUND", "ROUTE", "ROYAL", "RULER", "RURAL", "SCALE", "SCENE", "SCENT",
+      "SCOPE", "SCORE", "SCOUT", "SCRAP", "SERVE", "SHADE", "SHAKE", "SHALL", "SHAME", "SHAPE",
+      "SHARE", "SHARP", "SHEET", "SHELF", "SHELL", "SHIFT", "SHINE", "SHIRT", "SHOCK", "SHOOT",
+      "SHORE", "SHORT", "SHOUT", "SIGHT", "SIGMA", "SINCE", "SKILL", "SKIRT", "SLAVE", "SLEEP",
+      "SLICE", "SLIDE", "SMART", "SMELL", "SMILE", "SMOKE", "SOLAR", "SOLID", "SOLVE", "SORRY",
+      "SOUND", "SOUTH", "SPACE", "SPARE", "SPARK", "SPEAK", "SPEED", "SPELL", "SPEND", "SPICE",
+      "SPILL", "SPINE", "SPITE", "SPLIT", "SPOKE", "SPOON", "SPORT", "SPRAY", "STAFF", "STAGE",
+      "STAIN", "STAKE", "STAMP", "STAND", "STARE", "START", "STATE", "STEAM", "STEEL", "STEEP",
+      "STEER", "STICK", "STIFF", "STILL", "STOCK", "STONE", "STOOD", "STORE", "STORM", "STORY",
+      "STRIP", "STUDY", "STUFF", "STYLE", "SUGAR", "SUITE", "SUPER", "SWEET", "SWIFT", "SWING",
+      "TABLE", "TASTE", "TEACH", "THANK", "THEME", "THERE", "THICK", "THING", "THINK", "THIRD",
+      "THOSE", "THREE", "THREW", "THROW", "THUMB", "TIGER", "TIGHT", "TITLE", "TODAY", "TOKEN",
+      "TOOTH", "TOPIC", "TOTAL", "TOUCH", "TOUGH", "TOWER", "TRACK", "TRACT", "TRAIL", "TRAIN",
+      "TRAIT", "TREAT", "TREND", "TRIAL", "TRIBE", "TRICK", "TROOP", "TRUCK", "TRULY", "TRUNK",
+      "TRUST", "TRUTH", "TUMOR", "TWICE", "UNCLE", "UNDER", "UNION", "UNIFY", "UNIT", "UNITY",
+      "UNTIL", "UPPER", "UPSET", "URBAN", "USAGE", "USUAL", "VAGUE", "VALID", "VALUE", "VALVE",
+      "VAPOR", "VAULT", "VENUE", "VERB", "VERSE", "VIDEO", "VIGOR", "VILLA", "VIRAL", "VIRUS",
+      "VISIT", "VITAL", "VOICE", "VOTER", "WAGON", "WASTE", "WATCH", "WATER", "WAVE", "WEARY",
+      "WEAVE", "WHEAT", "WHEEL", "WHERE", "WHICH", "WHILE", "WHITE", "WHOLE", "WHOSE", "WIDOW",
+      "WIDTH", "WINDY", "WOMAN", "WORLD", "WORRY", "WORSE", "WORST", "WORTH", "WOULD", "WOUND",
+      "WRITE", "WRONG", "YACHT", "YEARN", "YIELD", "YOUNG", "YOUTH", "ZEBRA"
+    ];
+
+    const BASE_CORE_WORD_SET = new Set(BASE_CORE_WORDS);
+    const LOCAL_DEFINITIONS = {
+      "COPE": { pos: "verb", def: "To deal effectively with something difficult; to overcome problems.", ex: "She managed to cope with the immense challenge." },
+      "CATTLE": { pos: "noun", def: "Large domesticated bovine animals kept for milk or meat.", ex: "The cattle grazed peacefully across the green pastures." },
+      "OUTPACE": { pos: "verb", def: "To go faster than; to outrun or surpass in development.", ex: "Demand for the product continues to outpace supply." },
+      "TEACUP": { pos: "noun", def: "A small cup, typically with a handle, from which tea is drunk.", ex: "She placed the teacup carefully on the saucer." },
+      "POTATO": { pos: "noun", def: "A starchy edible tuber cultivated as an essential root vegetable.", ex: "He prepared roasted potatoes with herbs." },
+      "CAPE": { pos: "noun", def: "A sleeveless cloak, or a high point of land jutting into water.", ex: "The lighthouse stood atop the rocky cape." },
+      "PACE": { pos: "noun", def: "A single step taken in walking or running; a consistent speed.", ex: "They maintained a steady pace during the hike." },
+      "POUT": { pos: "verb", def: "To push out one's lips in annoyance or displeasure.", ex: "He pouted when his turn was skipped." }
+    };
+
+    const PRESET_PALETTES = [
+      { name: "Classic Bee", center: "#f7da21", outer: "#e6e6e6" },
+      { name: "Midnight Gold", center: "#ffc107", outer: "#263238" },
+      { name: "Sunset Coral", center: "#ff5722", outer: "#ffe0b2" },
+      { name: "Emerald Hive", center: "#10b981", outer: "#d1fae5" },
+      { name: "Cyber Neon", center: "#00e5ff", outer: "#212121" },
+      { name: "Lavender Dream", center: "#8b5cf6", outer: "#ede9fe" }
+    ];
+
+    let currentTheme = { center: "#f7da21", outer: "#e6e6e6" };
+
+    function getContrastColor(hexColor) {
+      const hex = hexColor.replace("#", "");
+      const r = parseInt(hex.substring(0, 2), 16) || 0;
+      const g = parseInt(hex.substring(2, 4), 16) || 0;
+      const b = parseInt(hex.substring(4, 6), 16) || 0;
+      return (((r * 299) + (g * 587) + (b * 114)) / 1000 >= 140) ? "#1a1a1a" : "#ffffff";
+    }
+
+    function applyHoneycombTheme(centerColor, outerColor) {
+      currentTheme.center = centerColor;
+      currentTheme.outer = outerColor;
+      document.documentElement.style.setProperty("--primary-center", centerColor);
+      document.documentElement.style.setProperty("--primary-center-text", getContrastColor(centerColor));
+      document.documentElement.style.setProperty("--outer-hex-color", outerColor);
+      document.documentElement.style.setProperty("--outer-hex-text", getContrastColor(outerColor));
+      document.getElementById("centerColorPicker").value = centerColor;
+      document.getElementById("outerColorPicker").value = outerColor;
+      localStorage.setItem("spelling_bee_theme_colors", JSON.stringify(currentTheme));
+    }
+
+    const VOWELS = ["A", "E", "I", "O", "U", "Y"];
+    const CONSONANTS = ["B","C","D","F","G","H","J","K","L","M","N","P","Q","R","S","T","V","W","X","Z"];
+    const RANDOM_DICTIONARY_VERSION = "dictionary-en-4.0.0";
+    const RANDOM_DICTIONARY_CACHE_KEY = "spelling_bee_random_dictionary_v1";
+    const RANDOM_DICTIONARY_URLS = {
+      aff: "https://cdn.jsdelivr.net/npm/dictionary-en@4.0.0/index.aff",
+      dic: "https://cdn.jsdelivr.net/npm/dictionary-en@4.0.0/index.dic"
+    };
+    const MIN_RANDOM_PUZZLE_WORDS = 150;
+    let randomDictionaryEntries = null;
+    let randomDictionaryLoadPromise = null;
+
+    async function fetchRandomDictionaryFile(url) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Dictionary download failed (${response.status})`);
+        return await response.text();
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    function parseHunspellAffixes(affixText) {
+      const rulesByFlag = new Map();
+      const lines = affixText.split(/\r?\n/);
+      for (let i = 0; i < lines.length; i++) {
+        const header = lines[i].trim().match(/^(PFX|SFX)\s+(\S+)\s+([YN])\s+(\d+)$/);
+        if (!header) continue;
+        const [, type, flag, cross, countText] = header;
+        const count = Number(countText);
+        const group = { type, cross: cross === "Y", rules: [] };
+        for (let j = 0; j < count && i + 1 < lines.length; j++) {
+          const parts = lines[++i].trim().split(/\s+/);
+          if (parts.length < 5 || parts[0] !== type || parts[1] !== flag) continue;
+          group.rules.push({
+            strip: parts[2] === "0" ? "" : parts[2],
+            add: parts[3] === "0" ? "" : parts[3].split("/")[0],
+            condition: parts[4]
+          });
+        }
+        rulesByFlag.set(flag, group);
+      }
+      return rulesByFlag;
+    }
+
+    function applyHunspellAffix(word, group, rule) {
+      const isPrefix = group.type === "PFX";
+      const condition = new RegExp(isPrefix ? `^${rule.condition}` : `${rule.condition}$`);
+      if (!condition.test(word)) return null;
+      if (isPrefix) {
+        if (rule.strip && !word.startsWith(rule.strip)) return null;
+        return rule.add + word.slice(rule.strip.length);
+      }
+      if (rule.strip && !word.endsWith(rule.strip)) return null;
+      return word.slice(0, word.length - rule.strip.length) + rule.add;
+    }
+
+    function parseHunspellWords(affixText, dictionaryText) {
+      const rulesByFlag = parseHunspellAffixes(affixText);
+      const wordMasks = new Map();
+      const lines = dictionaryText.split(/\r?\n/);
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const slash = line.lastIndexOf("/");
+        const root = slash === -1 ? line : line.slice(0, slash);
+        if (!/^[a-z]{4,}$/.test(root)) continue;
+
+        const addWord = word => {
+          if (typeof word !== "string" || !/^[a-z]{4,}$/.test(word)) return;
+          let mask = 0;
+          for (const letter of word) mask |= 1 << (letter.charCodeAt(0) - 97);
+          wordMasks.set(word, mask);
+        };
+        addWord(root);
+
+        const flags = slash === -1 ? "" : line.slice(slash + 1);
+        const affixes = Array.from(flags, flag => rulesByFlag.get(flag)).filter(Boolean);
+        const suffixes = affixes.filter(group => group.type === "SFX" && group.cross);
+        for (const group of affixes) {
+          for (const rule of group.rules) {
+            const derived = applyHunspellAffix(root, group, rule);
+            if (!derived) continue;
+            addWord(derived);
+            if (group.type === "PFX" && group.cross) {
+              for (const suffixGroup of suffixes) {
+                for (const suffixRule of suffixGroup.rules) {
+                  addWord(applyHunspellAffix(derived, suffixGroup, suffixRule));
+                }
+              }
+            }
+          }
+        }
+      }
+      return Array.from(wordMasks, ([word, mask]) => ({ word, mask }));
+    }
+
+    async function loadRandomDictionary() {
+      if (randomDictionaryEntries) return randomDictionaryEntries;
+      if (randomDictionaryLoadPromise) return randomDictionaryLoadPromise;
+      randomDictionaryLoadPromise = (async () => {
+        let affixText = "", dictionaryText = "";
+        try {
+          const cached = JSON.parse(localStorage.getItem(RANDOM_DICTIONARY_CACHE_KEY) || "null");
+          if (cached && cached.version === RANDOM_DICTIONARY_VERSION &&
+              typeof cached.aff === "string" && typeof cached.dic === "string") {
+            affixText = cached.aff;
+            dictionaryText = cached.dic;
+          }
+        } catch (e) {}
+
+        if (!affixText || !dictionaryText) {
+          [affixText, dictionaryText] = await Promise.all([
+            fetchRandomDictionaryFile(RANDOM_DICTIONARY_URLS.aff),
+            fetchRandomDictionaryFile(RANDOM_DICTIONARY_URLS.dic)
+          ]);
+          try {
+            localStorage.setItem(RANDOM_DICTIONARY_CACHE_KEY, JSON.stringify({
+              version: RANDOM_DICTIONARY_VERSION, aff: affixText, dic: dictionaryText
+            }));
+          } catch (e) {}
+        }
+
+        randomDictionaryEntries = parseHunspellWords(affixText, dictionaryText);
+        return randomDictionaryEntries;
+      })().finally(() => {
+        randomDictionaryLoadPromise = null;
+      });
+      return randomDictionaryLoadPromise;
+    }
+
+    function shuffleArray(items) {
+      const shuffled = [...items];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    }
+
+    function generateFreshRandomPuzzle(dictionaryEntries) {
+      for (let attempt = 0; attempt < 5000; attempt++) {
+        const numVowels = Math.random() > 0.5 ? 2 : 3;
+        const chosenLetters = [
+          ...shuffleArray(VOWELS).slice(0, numVowels),
+          ...shuffleArray(CONSONANTS).slice(0, 7 - numVowels)
+        ];
+        const center = chosenLetters[Math.floor(Math.random() * chosenLetters.length)];
+        const outer = chosenLetters.filter(letter => letter !== center);
+        let allowedMask = 0;
+        for (const letter of chosenLetters) allowedMask |= 1 << (letter.charCodeAt(0) - 65);
+
+        const matchedWords = new Set(BASE_CORE_WORDS.filter(word =>
+          word.length >= 4 && word.includes(center) &&
+          Array.from(word).every(letter => chosenLetters.includes(letter))
+        ));
+        for (const { word, mask } of dictionaryEntries) {
+          const centerMask = 1 << (center.charCodeAt(0) - 97);
+          if ((mask & centerMask) && (mask & ~allowedMask) === 0) {
+            matchedWords.add(word.toUpperCase());
+          }
+        }
+        if (matchedWords.size < MIN_RANDOM_PUZZLE_WORDS) continue;
+        return {
+          id: "rnd-" + Date.now(),
+          name: "Random Hive",
+          center,
+          outer,
+          words: Array.from(matchedWords),
+          dictionaryVersion: RANDOM_DICTIONARY_VERSION
+        };
+      }
+      throw new Error(`Could not find a hive with at least ${MIN_RANDOM_PUZZLE_WORDS} possible words.`);
+    }
+
+    const DAILY_PUZZLE = {
+      id: "daily-default",
+      name: "Daily Challenge",
+      center: "P",
+      outer: ["A", "E", "C", "O", "U", "T"],
+      words: [
+        "APACE", "ATOP", "CAPE", "CAPO", "CAPOTE", "CAPUT", "COOP", "COOPT", 
+        "COPE", "COPT", "COPTOUT", "COUP", "COUPE", "CUTUP", "EPAT", "OCTOPE", 
+        "OUTPACE", "OUTPOP", "PACE", "PACT", "PAPA", "PAPETTE", "PATE", "PATEE", 
+        "PATO", "PATOOT", "PEAT", "PEEP", "PEPO", "PETAP", "PETCOAT", "PETT", 
+        "PETTO", "POCO", "POET", "POOP", "POOT", "POPE", "POPOTE", "POPOUT", 
+        "POTA", "POTAE", "POTATO", "POTATOE", "POTO", "POTT", "POTTO", "POUT", 
+        "PUPA", "PUPAE", "PUPATE", "PUPPET", "PUTT", "TAPE", "TEACUP", "TEAPOT", 
+        "TOPCOAT", "TOPE", "TOPO", "CATTLE"
+      ]
+    };
+
+    const TRUSTED_DAILY_WORD_SET = new Set(DAILY_PUZZLE.words);
+
+    function isTrustedPuzzleWord(word) {
+      return BASE_CORE_WORD_SET.has(word) ||
+        (activePuzzle.id === DAILY_PUZZLE.id && TRUSTED_DAILY_WORD_SET.has(word)) ||
+        (activePuzzle.dictionaryVersion === RANDOM_DICTIONARY_VERSION &&
+          activePuzzle.words.includes(word));
+    }
+
+    let activePuzzle = DAILY_PUZZLE;
+    let currentInput = "";
+    let foundWords = new Set();
+    let currentShuffledOuter = [...activePuzzle.outer];
+    let isDailyMode = true;
+
+    const RANK_TIERS = [
+      { name: "Beginner", percent: 0 }, { name: "Novice", percent: 3 },
+      { name: "Okay", percent: 7 }, { name: "Good", percent: 12 },
+      { name: "Solid", percent: 23 }, { name: "Nice", percent: 35 },
+      { name: "Great", percent: 56 }, { name: "Amazing", percent: 72 },
+      { name: "Genius", percent: 100 }
+    ];
+
+    function isPangram(word) {
+      const letters = new Set(word.split(""));
+      return [activePuzzle.center, ...activePuzzle.outer].every(l => letters.has(l));
+    }
+
+    function getPossibleWords() {
+      const allowedLetters = new Set([activePuzzle.center, ...activePuzzle.outer]);
+      const possibleWords = new Set([...BASE_CORE_WORDS, ...activePuzzle.words]);
+      return Array.from(possibleWords).filter(word =>
+        word.length >= 4 && word.includes(activePuzzle.center) &&
+        Array.from(word).every(letter => allowedLetters.has(letter))
+      );
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      loadSavedTheme();
+      loadSavedState();
+      buildPalettesUI();
+      bindEvents();
+      updateHoneycombLetters();
+      updateUI();
+    });
+
+    function loadSavedTheme() {
+      try {
+        const saved = localStorage.getItem("spelling_bee_theme_colors");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          applyHoneycombTheme(parsed.center, parsed.outer);
+          return;
+        }
+      } catch (e) {}
+      applyHoneycombTheme("#f7da21", "#e6e6e6");
+    }
+
+    function loadSavedState() {
+      try {
+        const saved = localStorage.getItem("spelling_bee_state_v2");
+        if (saved) {
+          const state = JSON.parse(saved);
+          if (state.activePuzzle) {
+            if (state.activePuzzle.id?.startsWith("rnd-") &&
+                (state.activePuzzle.dictionaryVersion !== RANDOM_DICTIONARY_VERSION ||
+                 !Array.isArray(state.activePuzzle.words) ||
+                 state.activePuzzle.words.length < MIN_RANDOM_PUZZLE_WORDS)) {
+              resetToDailyPuzzle();
+              return;
+            }
+            activePuzzle = state.activePuzzle;
+            currentShuffledOuter = state.currentShuffledOuter || [...activePuzzle.outer];
+            isDailyMode = state.isDailyMode ?? true;
+            activePuzzle.words = activePuzzle.words.filter(isTrustedPuzzleWord);
+            foundWords = new Set((state.foundWords || []).filter(isTrustedPuzzleWord));
+            return;
+          }
+        }
+      } catch (e) {}
+      resetToDailyPuzzle();
+    }
+
+    function saveState() {
+      localStorage.setItem("spelling_bee_state_v2", JSON.stringify({
+        activePuzzle, currentShuffledOuter, isDailyMode,
+        foundWords: Array.from(foundWords)
+      }));
+    }
+
+    function resetToDailyPuzzle() {
+      activePuzzle = DAILY_PUZZLE;
+      currentShuffledOuter = [...activePuzzle.outer];
+      isDailyMode = true;
+      foundWords = new Set();
+      saveState();
+      updateHoneycombLetters();
+      updateUI();
+    }
+
+    function updateHoneycombLetters() {
+      const centerTextEl = document.querySelector("#hexCenter text");
+      if (centerTextEl) centerTextEl.textContent = activePuzzle.center;
+      for (let i = 0; i < 6; i++) {
+        const outerTextEl = document.querySelector(`#hex${i} text`);
+        if (outerTextEl) outerTextEl.textContent = currentShuffledOuter[i];
+      }
+      document.getElementById("modeBadgeText").textContent = isDailyMode ? "Daily Hive" : "Random Hive";
+    }
+
+    function updateInputDisplay() {
+      const stage = document.getElementById("inputLetters");
+      stage.innerHTML = "";
+      for (const char of currentInput) {
+        const span = document.createElement("span");
+        span.className = "input-letter" + (char === activePuzzle.center ? " is-center" : "");
+        span.textContent = char;
+        stage.appendChild(span);
+      }
+      const cursor = document.createElement("span");
+      cursor.className = "blinking-cursor";
+      stage.appendChild(cursor);
+    }
+
+    function triggerShake() {
+      const stage = document.getElementById("inputLetters");
+      stage.classList.remove("shake");
+      void stage.offsetWidth;
+      stage.classList.add("shake");
+      setTimeout(() => stage.classList.remove("shake"), 400);
+    }
+
+    function showToast(msg, isSuccess = false) {
+      const container = document.getElementById("toastContainer");
+      container.innerHTML = "";
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => { if (container.contains(toast)) toast.remove(); }, 1800);
+    }
+
+    const DICTIONARY_CACHE_KEY = "spelling_bee_dictionary_cache_v2";
+    const dictionaryWordCache = new Map();
+    const definitionCache = new Map();
+    const wordLookupRequests = new Map();
+    const definitionRequests = new Map();
+    let dictionaryCacheLoaded = false;
+    let definitionLookupId = 0;
+
+    function loadDictionaryCache() {
+      if (dictionaryCacheLoaded) return;
+      dictionaryCacheLoaded = true;
+      try {
+        const saved = localStorage.getItem(DICTIONARY_CACHE_KEY);
+        if (!saved) return;
+        const parsed = JSON.parse(saved);
+        const now = Date.now();
+        Object.entries(parsed.words || {}).forEach(([word, entry]) => {
+          if (/^[A-Z]+$/.test(word) && typeof entry.valid === "boolean" &&
+              Number.isFinite(entry.expiresAt) && entry.expiresAt > now) {
+            dictionaryWordCache.set(word, entry);
+          }
+        });
+        Object.entries(parsed.definitions || {}).forEach(([word, entry]) => {
+          if (/^[A-Z]+$/.test(word) && entry && typeof entry === "object" &&
+              typeof entry.word === "string" && Array.isArray(entry.meanings) &&
+              entry.meanings.every(meaning => meaning && typeof meaning.partOfSpeech === "string" &&
+                Array.isArray(meaning.definitions) && meaning.definitions.every(definition =>
+                  definition && typeof definition.definition === "string" &&
+                  typeof definition.example === "string"))) {
+            definitionCache.set(word, entry);
+          }
+        });
+      } catch (e) {
+        dictionaryWordCache.clear();
+        definitionCache.clear();
+      }
+    }
+
+    function saveDictionaryCache() {
+      try {
+        while (dictionaryWordCache.size > 500) {
+          dictionaryWordCache.delete(dictionaryWordCache.keys().next().value);
+        }
+        while (definitionCache.size > 300) {
+          definitionCache.delete(definitionCache.keys().next().value);
+        }
+        localStorage.setItem(DICTIONARY_CACHE_KEY, JSON.stringify({
+          words: Object.fromEntries(dictionaryWordCache),
+          definitions: Object.fromEntries(definitionCache)
+        }));
+      } catch (e) {}
+    }
+
+    async function fetchDictionaryJson(url, timeoutMs) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Dictionary request failed (${response.status})`);
+        return await response.json();
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    function isStandardDictionaryWord(data, word) {
+      if (!Array.isArray(data)) return false;
+      const entry = data.find(item =>
+        typeof item.word === "string" && item.word.toUpperCase() === word
+      );
+      if (!entry || !Array.isArray(entry.tags) || !Array.isArray(entry.defs)) return false;
+
+      const tags = entry.tags.map(tag => String(tag).toLowerCase());
+      const disallowedTags = new Set(["prop", "abbr", "acronym"]);
+      const wordClasses = new Set(["n", "v", "adj", "adv", "u", "interj", "conj", "prep", "pron", "art", "det"]);
+      return !tags.some(tag => disallowedTags.has(tag)) &&
+        tags.some(tag => wordClasses.has(tag)) &&
+        entry.defs.some(definition => typeof definition === "string" && definition.trim().length > 0);
+    }
+
+    async function verifyWordOnline(word) {
+      loadDictionaryCache();
+      const cached = dictionaryWordCache.get(word);
+      if (cached && cached.expiresAt > Date.now()) return { valid: cached.valid, unavailable: false };
+      if (wordLookupRequests.has(word)) return wordLookupRequests.get(word);
+
+      const request = (async () => {
+        try {
+          const data = await fetchDictionaryJson(
+            `https://api.datamuse.com/words?sp=${encodeURIComponent(word.toLowerCase())}&md=dp&max=1`,
+            3500
+          );
+          const valid = isStandardDictionaryWord(data, word);
+          const cacheDuration = valid ? 7 : 1;
+          dictionaryWordCache.set(word, { valid, expiresAt: Date.now() + cacheDuration * 24 * 60 * 60 * 1000 });
+          saveDictionaryCache();
+          return { valid, unavailable: false };
+        } catch (e) {
+          return { valid: false, unavailable: true };
+        } finally {
+          wordLookupRequests.delete(word);
+        }
+      })();
+      wordLookupRequests.set(word, request);
+      return request;
+    }
+
+    async function submitWord() {
+      const word = currentInput.toUpperCase().trim();
+      currentInput = "";
+      updateInputDisplay();
+      if (!word) return;
+      if (word.length < 4) { triggerShake(); showToast("Too short"); return; }
+      if (!word.includes(activePuzzle.center)) { triggerShake(); showToast(`Missing center (${activePuzzle.center})`); return; }
+
+      const allowed = new Set([activePuzzle.center, ...activePuzzle.outer]);
+      for (const char of word) {
+        if (!allowed.has(char)) { triggerShake(); showToast(`Invalid letter: ${char}`); return; }
+      }
+      if (foundWords.has(word)) { triggerShake(); showToast("Already found"); return; }
+
+      let isValid = isTrustedPuzzleWord(word);
+      if (!isValid) {
+        showToast("Checking dictionary...");
+        const lookup = await verifyWordOnline(word);
+        isValid = lookup.valid;
+        if (lookup.unavailable) {
+          triggerShake();
+          showToast("Dictionary unavailable. Please try again.");
+          return;
+        }
+        if (isValid && !BASE_CORE_WORD_SET.has(word) && !activePuzzle.words.includes(word)) {
+          activePuzzle.words.push(word);
+        }
+      }
+      if (!isValid) { triggerShake(); showToast("Not in word list"); return; }
+
+      foundWords.add(word);
+      if (isPangram(word)) {
+        showToast("PANGRAM!", true);
+        if (typeof confetti === "function") confetti({ particleCount: 80, spread: 65, origin: { y: 0.6 } });
+      } else {
+        showToast("Nice!", true);
+      }
+      saveState();
+      updateUI();
+    }
+
+    function normalizeDictionaryEntry(data, word) {
+      const entry = Array.isArray(data) ? data[0] : null;
+      if (!entry || !Array.isArray(entry.meanings)) return null;
+      const meanings = entry.meanings.slice(0, 3).map(meaning => ({
+        partOfSpeech: meaning.partOfSpeech || "Definition",
+        definitions: (Array.isArray(meaning.definitions) ? meaning.definitions : [])
+          .slice(0, 2)
+          .filter(definition => typeof definition.definition === "string")
+          .map(definition => ({
+            definition: definition.definition,
+            example: typeof definition.example === "string" ? definition.example : ""
+          }))
+      })).filter(meaning => meaning.definitions.length > 0);
+      if (meanings.length === 0) return null;
+      return { word: entry.word || word.toLowerCase(), phonetic: entry.phonetic || "", meanings };
+    }
+
+    function normalizeDatamuseDefinition(data, word) {
+      const entry = Array.isArray(data) ? data.find(item =>
+        typeof item.word === "string" && item.word.toUpperCase() === word && Array.isArray(item.defs)
+      ) : null;
+      if (!entry) return null;
+      const definitions = entry.defs.slice(0, 3).map(definition => {
+        const parts = definition.split("\t");
+        return { partOfSpeech: parts[0] || "Definition", definitions: [{ definition: parts[1] || definition, example: "" }] };
+      }).filter(item => item.definitions[0].definition);
+      if (definitions.length === 0) return null;
+      return { word: word.toLowerCase(), phonetic: "English Definition", meanings: definitions };
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+      })[char]);
+    }
+
+    function formatDefinition(record) {
+      let html = `<div class="def-word-title">${escapeHtml(record.word)}</div>`;
+      html += `<div class="def-phonetic">${escapeHtml(record.phonetic || "English Definition")}</div>`;
+      record.meanings.slice(0, 3).forEach(meaning => {
+        html += `<div class="def-item"><div class="def-pos">${escapeHtml(meaning.partOfSpeech || "Definition")}</div>`;
+        meaning.definitions.slice(0, 2).forEach(definition => {
+          html += `<div class="def-text">${escapeHtml(definition.definition)}</div>`;
+          if (definition.example) html += `<div class="def-example">"${escapeHtml(definition.example)}"</div>`;
+        });
+        html += "</div>";
+      });
+      return html;
+    }
+
+    async function getDefinitionRecord(word) {
+      loadDictionaryCache();
+      if (definitionCache.has(word)) return definitionCache.get(word);
+      if (definitionRequests.has(word)) return definitionRequests.get(word);
+
+      const encodedWord = encodeURIComponent(word.toLowerCase());
+      const request = Promise.any([
+        fetchDictionaryJson(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodedWord}`, 5000)
+          .then(data => {
+            const record = normalizeDictionaryEntry(data, word);
+            if (!record) throw new Error("No definition in dictionary response");
+            return record;
+          }),
+        fetchDictionaryJson(`https://api.datamuse.com/words?sp=${encodedWord}&md=d&max=1`, 5000)
+          .then(data => {
+            const record = normalizeDatamuseDefinition(data, word);
+            if (!record) throw new Error("No definition in dictionary response");
+            return record;
+          })
+      ]).then(record => {
+        definitionCache.set(word, record);
+        saveDictionaryCache();
+        return record;
+      }).finally(() => definitionRequests.delete(word));
+      definitionRequests.set(word, request);
+      return request;
+    }
+
+    async function fetchAndShowDefinition(word) {
+      const modal = document.getElementById("defModal");
+      const content = document.getElementById("defContent");
+      const upper = word.toUpperCase();
+      const lookupId = ++definitionLookupId;
+      modal.classList.add("open");
+      content.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted);">Looking up <strong>${escapeHtml(word)}</strong>...</div>`;
+
+      if (LOCAL_DEFINITIONS[upper]) {
+        const item = LOCAL_DEFINITIONS[upper];
+        content.innerHTML = formatDefinition({
+          word: word.toLowerCase(),
+          phonetic: "Verified Dictionary Entry",
+          meanings: [{ partOfSpeech: item.pos, definitions: [{ definition: item.def, example: item.ex || "" }] }]
+        });
+        return;
+      }
+
+      try {
+        const record = await getDefinitionRecord(upper);
+        if (lookupId === definitionLookupId) content.innerHTML = formatDefinition(record);
+      } catch (e) {
+        if (lookupId === definitionLookupId) {
+          content.innerHTML = `
+            <div class="def-word-title">${escapeHtml(word.toLowerCase())}</div>
+            <div class="def-phonetic">Definition unavailable</div>
+            <div style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.5; padding: 10px 0;">Could not reach a dictionary service. Please try again shortly.</div>
+          `;
+        }
+      }
+    }
+
+    function getRankThreshold(tier, totalWords) {
+      if (tier.percent === 0) return 0;
+      if (totalWords <= 0) return Infinity;
+      return Math.ceil(tier.percent * totalWords / 100);
+    }
+
+    function getRankInfo(wordsFound, totalWords) {
+      let currentTier = RANK_TIERS[0], nextTier = null;
+      if (totalWords <= 0) return { currentTier, nextTier };
+      for (let i = 0; i < RANK_TIERS.length; i++) {
+        if (wordsFound >= getRankThreshold(RANK_TIERS[i], totalWords)) {
+          currentTier = RANK_TIERS[i];
+          nextTier = RANK_TIERS[i + 1] || null;
+        }
+      }
+      return { currentTier, nextTier };
+    }
+
+    function updateUI() {
+      updateInputDisplay();
+      const totalWords = getPossibleWords().length;
+      const wordsFound = foundWords.size;
+      document.getElementById("foundWordsCountLabel").textContent = wordsFound;
+      document.getElementById("maxWordsLabel").textContent = totalWords;
+      document.getElementById("possibleWordsLabel").textContent = totalWords;
+      const { currentTier, nextTier } = getRankInfo(wordsFound, totalWords);
+      document.getElementById("currentRankLabel").textContent = currentTier.name;
+      const wordsToNextTier = nextTier ? getRankThreshold(nextTier, totalWords) - wordsFound : 0;
+      document.getElementById("rankNextLabel").textContent = nextTier ?
+        `${wordsToNextTier} more word${wordsToNextTier === 1 ? "" : "s"} to ${nextTier.name}` :
+        totalWords > 0 ? "Genius achieved!" : "No valid words in this hive";
+
+      const progressPercent = totalWords > 0 ? (wordsFound / totalWords) * 100 : 0;
+      document.getElementById("progressFill").style.width = Math.min(100, Math.max(0, progressPercent)) + "%";
+
+      const milestonesContainer = document.getElementById("progressMilestones");
+      milestonesContainer.innerHTML = "";
+      RANK_TIERS.forEach(tier => {
+        const dot = document.createElement("div");
+        dot.className = "milestone-dot";
+        dot.style.left = tier.percent + "%";
+        if (wordsFound >= getRankThreshold(tier, totalWords)) dot.classList.add("active");
+        milestonesContainer.appendChild(dot);
+      });
+
+      const count = foundWords.size;
+      document.getElementById("accordionSummaryText").textContent = count === 0 ? "Your words (0)..." : `You have found ${count} word${count === 1 ? '' : 's'}`;
+
+      const grid = document.getElementById("wordsGrid");
+      grid.innerHTML = "";
+      Array.from(foundWords).sort().forEach(word => {
+        const pill = document.createElement("div");
+        const pangram = isPangram(word);
+        pill.className = "found-word-pill" + (pangram ? " is-pangram" : "");
+        pill.dataset.word = word;
+        pill.innerHTML = `<span>${word.toLowerCase()}</span>${pangram ? '<span>★</span>' : ''}`;
+        grid.appendChild(pill);
+      });
+    }
+
+    function populateHintMatrix() {
+      const remaining = activePuzzle.words.filter(w => !foundWords.has(w));
+      document.getElementById("hintWordsLeft").textContent = remaining.length;
+      document.getElementById("hintPangramsLeft").textContent = remaining.filter(w => isPangram(w)).length;
+
+      const lengths = Array.from(new Set(activePuzzle.words.map(w => w.length))).sort((a,b) => a - b);
+      const letters = Array.from(new Set([activePuzzle.center, ...activePuzzle.outer])).sort();
+      let tableHtml = `<tr><th></th>`;
+      lengths.forEach(l => tableHtml += `<th>${l}</th>`);
+      tableHtml += `<th>Σ</th></tr>`;
+
+      const colTotals = {};
+      lengths.forEach(l => colTotals[l] = 0);
+      let grandTotal = 0;
+
+      letters.forEach(letter => {
+        let rowTotal = 0, cells = "";
+        lengths.forEach(l => {
+          const c = remaining.filter(w => w.startsWith(letter) && w.length === l).length;
+          colTotals[l] += c; rowTotal += c;
+          cells += c > 0 ? `<td>${c}</td>` : `<td style="color:var(--border-color);">-</td>`;
+        });
+        grandTotal += rowTotal;
+        tableHtml += `<tr><th>${letter}</th>${cells}<th>${rowTotal}</th></tr>`;
+      });
+      tableHtml += `<tr><th>Σ</th>`;
+      lengths.forEach(l => tableHtml += `<th>${colTotals[l]}</th>`);
+      tableHtml += `<th>${grandTotal}</th></tr>`;
+      document.getElementById("matrixTable").innerHTML = tableHtml;
+
+      const twoLetterCounts = {};
+      remaining.forEach(w => {
+        const pref = w.slice(0, 2);
+        twoLetterCounts[pref] = (twoLetterCounts[pref] || 0) + 1;
+      });
+      const tagsContainer = document.getElementById("twoLetterTags");
+      tagsContainer.innerHTML = "";
+      Object.keys(twoLetterCounts).sort().forEach(pref => {
+        const tag = document.createElement("span");
+        tag.className = "two-letter-pill";
+        tag.textContent = `${pref} - ${twoLetterCounts[pref]}`;
+        tagsContainer.appendChild(tag);
+      });
+    }
+
+    function buildPalettesUI() {
+      const grid = document.getElementById("paletteGrid");
+      grid.innerHTML = "";
+      PRESET_PALETTES.forEach(pal => {
+        const card = document.createElement("div");
+        card.className = "palette-card";
+        card.innerHTML = `<div class="palette-preview" style="background:${pal.outer};"><div class="palette-preview-inner" style="background:${pal.center};"></div></div><div class="palette-info">${pal.name}</div>`;
+        card.addEventListener("click", () => applyHoneycombTheme(pal.center, pal.outer));
+        grid.appendChild(card);
+      });
+    }
+
+    function bindEvents() {
+      document.querySelectorAll(".hex-cell").forEach(cell => {
+        cell.addEventListener("click", () => {
+          const idx = cell.dataset.idx;
+          const letter = idx === "center" ? activePuzzle.center : currentShuffledOuter[parseInt(idx, 10)];
+          if (letter) { currentInput += letter; updateInputDisplay(); }
+        });
+      });
+
+      document.getElementById("wordsGrid").addEventListener("click", (e) => {
+        const pill = e.target.closest(".found-word-pill");
+        if (pill && pill.dataset.word) fetchAndShowDefinition(pill.dataset.word);
+      });
+
+      document.getElementById("deleteBtn").addEventListener("click", () => {
+        if (currentInput.length > 0) { currentInput = currentInput.slice(0, -1); updateInputDisplay(); }
+      });
+      document.getElementById("enterBtn").addEventListener("click", submitWord);
+      document.getElementById("shuffleBtn").addEventListener("click", () => {
+        for (let i = currentShuffledOuter.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [currentShuffledOuter[i], currentShuffledOuter[j]] = [currentShuffledOuter[j], currentShuffledOuter[i]];
+        }
+        updateHoneycombLetters();
+        saveState();
+      });
+
+      document.getElementById("accordionToggle").addEventListener("click", () => {
+        document.getElementById("accordionContent").classList.toggle("open");
+        document.getElementById("accordionChevron").classList.toggle("open");
+      });
+
+      document.getElementById("newRandomGameBtn").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        showToast("Loading dictionary and finding a 150-word hive...");
+        try {
+          const dictionaryEntries = await loadRandomDictionary();
+          activePuzzle = generateFreshRandomPuzzle(dictionaryEntries);
+          currentShuffledOuter = [...activePuzzle.outer];
+          isDailyMode = false;
+          foundWords = new Set();
+          saveState();
+          updateHoneycombLetters();
+          updateUI();
+          showToast(`New hive! ${getPossibleWords().length} possible words`, true);
+        } catch (error) {
+          console.error("Unable to generate a qualifying random hive:", error);
+          showToast(error.message || "Could not load the word list. Please try again.");
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      document.getElementById("modeBadgeBtn").addEventListener("click", () => {
+        if (!isDailyMode) { resetToDailyPuzzle(); showToast("Switched back to Daily Hive"); }
+      });
+
+      document.getElementById("centerColorPicker").addEventListener("input", (e) => applyHoneycombTheme(e.target.value, currentTheme.outer));
+      document.getElementById("outerColorPicker").addEventListener("input", (e) => applyHoneycombTheme(currentTheme.center, e.target.value));
+
+      document.getElementById("paletteBtn").addEventListener("click", () => document.getElementById("themeModal").classList.add("open"));
+      document.getElementById("hintBtn").addEventListener("click", () => { populateHintMatrix(); document.getElementById("hintModal").classList.add("open"); });
+      document.getElementById("helpBtn").addEventListener("click", () => document.getElementById("helpModal").classList.add("open"));
+
+      document.querySelectorAll("[data-close]").forEach(btn => {
+        btn.addEventListener("click", () => document.getElementById(btn.getAttribute("data-close")).classList.remove("open"));
+      });
+      document.querySelectorAll(".modal-backdrop").forEach(b => {
+        b.addEventListener("click", (e) => { if (e.target === b) b.classList.remove("open"); });
+      });
+
+      document.getElementById("shareProgressBtn").addEventListener("click", () => {
+        const totalWords = getPossibleWords().length;
+        const { currentTier } = getRankInfo(foundWords.size, totalWords);
+        const text = `Spelling Bee 🐝\nRank: ${currentTier.name}\nWords: ${foundWords.size}/${totalWords}`;
+        if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => showToast("Progress copied to clipboard!", true));
+      });
+
+      document.getElementById("themeToggleBtn").addEventListener("click", () => {
+        document.documentElement.getAttribute("data-theme") === "dark" ? 
+          document.documentElement.removeAttribute("data-theme") : 
+          document.documentElement.setAttribute("data-theme", "dark");
+      });
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { document.querySelectorAll(".modal-backdrop.open").forEach(m => m.classList.remove("open")); return; }
+        if (document.querySelector(".modal-backdrop.open")) return;
+        const key = e.key.toUpperCase();
+        if (key === "ENTER") { e.preventDefault(); submitWord(); }
+        else if (key === "BACKSPACE") { e.preventDefault(); if (currentInput.length > 0) { currentInput = currentInput.slice(0, -1); updateInputDisplay(); } }
+        else if (key === " " || e.code === "Space") { e.preventDefault(); document.getElementById("shuffleBtn").click(); }
+        else if (/^[A-Z]$/.test(key)) {
+          if ([activePuzzle.center, ...activePuzzle.outer].includes(key)) { currentInput += key; updateInputDisplay(); }
+          else triggerShake();
+        }
+      });
+    }
+  </script>
+</body>
+</html>
