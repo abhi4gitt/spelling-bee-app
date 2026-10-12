@@ -77,6 +77,10 @@
     .rank-progress-container { width: 100%; margin-bottom: 12px; }
     .rank-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
     .rank-title { font-size: 1.1rem; font-weight: 800; }
+    .rank-crown { display: none; margin-right: 4px; }
+    .rank-crown.visible { display: inline; }
+    .score-summary { font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; }
+    .score-summary span { color: var(--text-muted); }
     .rank-next { font-size: 0.8rem; color: var(--text-muted); }
     .words-current { font-size: 0.95rem; font-weight: 700; }
     .possible-words-count { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; }
@@ -235,7 +239,7 @@
       </div>
     </div>
     <div class="header-right">
-      <button class="icon-btn" id="newRandomGameBtn" title="Generate Fresh Random 26-Letter Puzzle">
+      <button class="icon-btn" id="newRandomGameBtn" title="Generate a Random Seven-Letter Puzzle">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
       </button>
       <button class="icon-btn" id="paletteBtn" title="Theme Customizer">
@@ -255,16 +259,17 @@
   <main>
     <div class="rank-progress-container">
       <div class="possible-words-count">Possible words: <span id="possibleWordsLabel">0</span></div>
+      <div class="score-summary">Score: <span id="currentScoreLabel">0</span> <span>/</span> <span id="maxScoreLabel">0</span></div>
       <div class="rank-header">
-        <div class="rank-title" id="currentRankLabel">Beginner</div>
+        <div class="rank-title"><span class="rank-crown" id="rankCrown" aria-hidden="true">👑</span><span id="currentRankLabel">Beginner</span></div>
         <div class="words-current">Words: <span id="foundWordsCountLabel">0</span></div>
       </div>
       <div class="rank-next" id="rankNextLabel">Loading word ranks...</div>
-      <div class="progress-bar-wrapper">
+      <div class="progress-bar-wrapper" id="scoreProgress" role="progressbar" aria-label="Score progress" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
         <div class="progress-fill" id="progressFill"></div>
         <div class="progress-milestones" id="progressMilestones"></div>
       </div>
-      <div class="progress-labels"><span>0</span><span id="maxWordsLabel">0</span></div>
+      <div class="progress-labels"><span>0</span><span id="maxScoreProgressLabel">0</span></div>
     </div>
     <div class="word-list-accordion">
       <div class="accordion-header" id="accordionToggle">
@@ -376,11 +381,18 @@
           <li>Words must be <strong>at least 4 letters</strong>.</li>
           <li>Words <strong>MUST include the center letter</strong>.</li>
           <li>Letters may be used <strong>multiple times</strong>.</li>
+          <li>The letter <strong>S</strong> is never in the hive.</li>
+          <li>Only standard English words are accepted; proper nouns, hyphenated words, obscure slang, archaic words, and profanity are excluded.</li>
+        </ul>
+        <h4 style="margin: 10px 0 4px;">Scoring:</h4>
+        <ul style="margin-left: 20px; margin-bottom: 12px;">
+          <li>4-letter words earn 1 point; longer words earn 1 point per letter.</li>
+          <li>Pangrams use all 7 letters and earn a 7-point bonus.</li>
         </ul>
         <h4 style="margin: 10px 0 4px;">Word ranks:</h4>
         <ul style="margin-left: 20px; margin-bottom: 12px;">
-          <li>Your rank is based on the number of possible words you find.</li>
-          <li>Find more words to progress through Beginner, Novice, Okay, Good, Solid, Nice, Great, Amazing, and Genius.</li>
+          <li>Your rank is based on your score as a percentage of the maximum possible score.</li>
+          <li>Beginner 0%, Good Start 2%, Moving Up 5%, Good 8%, Solid 15%, Nice 25%, Great 40%, Amazing 50%, Genius 70%, Queen Bee 100%.</li>
         </ul>
       </div>
     </div>
@@ -509,15 +521,12 @@
       localStorage.setItem("spelling_bee_theme_colors", JSON.stringify(currentTheme));
     }
 
-    const VOWELS = ["A", "E", "I", "O", "U", "Y"];
-    const CONSONANTS = ["B","C","D","F","G","H","J","K","L","M","N","P","Q","R","S","T","V","W","X","Z"];
     const RANDOM_DICTIONARY_VERSION = "dictionary-en-4.0.0";
     const RANDOM_DICTIONARY_CACHE_KEY = "spelling_bee_random_dictionary_v1";
     const RANDOM_DICTIONARY_URLS = {
       aff: "https://cdn.jsdelivr.net/npm/dictionary-en@4.0.0/index.aff",
       dic: "https://cdn.jsdelivr.net/npm/dictionary-en@4.0.0/index.dic"
     };
-    const MIN_RANDOM_PUZZLE_WORDS = 150;
     let randomDictionaryEntries = null;
     let randomDictionaryLoadPromise = null;
 
@@ -652,38 +661,68 @@
     }
 
     function generateFreshRandomPuzzle(dictionaryEntries) {
-      for (let attempt = 0; attempt < 5000; attempt++) {
-        const numVowels = Math.random() > 0.5 ? 2 : 3;
-        const chosenLetters = [
-          ...shuffleArray(VOWELS).slice(0, numVowels),
-          ...shuffleArray(CONSONANTS).slice(0, 7 - numVowels)
-        ];
-        const center = chosenLetters[Math.floor(Math.random() * chosenLetters.length)];
-        const outer = chosenLetters.filter(letter => letter !== center);
-        let allowedMask = 0;
-        for (const letter of chosenLetters) allowedMask |= 1 << (letter.charCodeAt(0) - 65);
+      const pangramSeeds = dictionaryEntries.filter(({ word, mask }) =>
+        !word.includes("s") && countSetBits(mask) === 7
+      );
+      if (pangramSeeds.length === 0) throw new Error("The dictionary did not contain a pangram for a new hive.");
 
-        const matchedWords = new Set(BASE_CORE_WORDS.filter(word =>
-          word.length >= 4 && word.includes(center) &&
-          Array.from(word).every(letter => chosenLetters.includes(letter))
-        ));
-        for (const { word, mask } of dictionaryEntries) {
-          const centerMask = 1 << (center.charCodeAt(0) - 97);
-          if ((mask & centerMask) && (mask & ~allowedMask) === 0) {
-            matchedWords.add(word.toUpperCase());
-          }
+      const pangramSeed = pangramSeeds[Math.floor(Math.random() * pangramSeeds.length)];
+      const chosenLetters = Array.from({ length: 26 }, (_, index) =>
+        String.fromCharCode(65 + index)
+      ).filter((_, index) => pangramSeed.mask & (1 << index));
+      const center = chosenLetters[Math.floor(Math.random() * chosenLetters.length)];
+      const outer = chosenLetters.filter(letter => letter !== center);
+      let allowedMask = 0;
+      for (const letter of chosenLetters) allowedMask |= 1 << (letter.charCodeAt(0) - 65);
+
+      const matchedWords = new Set(BASE_CORE_WORDS.filter(word =>
+        word.length >= 4 && word.includes(center) &&
+        Array.from(word).every(letter => chosenLetters.includes(letter))
+      ));
+      for (const { word, mask } of dictionaryEntries) {
+        const centerMask = 1 << (center.charCodeAt(0) - 97);
+        if ((mask & centerMask) && (mask & ~allowedMask) === 0) {
+          matchedWords.add(word.toUpperCase());
         }
-        if (matchedWords.size < MIN_RANDOM_PUZZLE_WORDS) continue;
-        return {
-          id: "rnd-" + Date.now(),
-          name: "Random Hive",
-          center,
-          outer,
-          words: Array.from(matchedWords),
-          dictionaryVersion: RANDOM_DICTIONARY_VERSION
-        };
       }
-      throw new Error(`Could not find a hive with at least ${MIN_RANDOM_PUZZLE_WORDS} possible words.`);
+      if (!Array.from(matchedWords).some(word => isPangramForLetters(word, center, outer))) {
+        throw new Error("Could not build a hive containing a pangram.");
+      }
+      return {
+        id: "rnd-" + Date.now(),
+        name: "Random Hive",
+        center,
+        outer,
+        words: Array.from(matchedWords),
+        dictionaryVersion: RANDOM_DICTIONARY_VERSION
+      };
+    }
+
+    function countSetBits(mask) {
+      let count = 0;
+      while (mask) {
+        count += mask & 1;
+        mask >>>= 1;
+      }
+      return count;
+    }
+
+    function isPangramForLetters(word, center, outer) {
+      const letters = new Set(word);
+      return [center, ...outer].every(letter => letters.has(letter));
+    }
+
+    function hasValidPuzzleRules(puzzle) {
+      if (!puzzle || !Array.isArray(puzzle.outer) || puzzle.outer.length !== 6 ||
+          !Array.isArray(puzzle.words)) return false;
+      const letters = [puzzle.center, ...puzzle.outer];
+      return letters.length === 7 && new Set(letters).size === 7 &&
+        letters.every(letter => /^[A-Z]$/.test(letter) && letter !== "S") &&
+        puzzle.words.some(word =>
+          /^[A-Z]+$/.test(word) && word.length >= 4 && word.includes(puzzle.center) &&
+          Array.from(word).every(letter => letters.includes(letter)) &&
+          isPangramForLetters(word, puzzle.center, puzzle.outer)
+        );
     }
 
     const DAILY_PUZZLE = {
@@ -719,23 +758,37 @@
     let isDailyMode = true;
 
     const RANK_TIERS = [
-      { name: "Beginner", percent: 0 }, { name: "Novice", percent: 3 },
-      { name: "Okay", percent: 7 }, { name: "Good", percent: 12 },
-      { name: "Solid", percent: 23 }, { name: "Nice", percent: 35 },
-      { name: "Great", percent: 56 }, { name: "Amazing", percent: 72 },
-      { name: "Genius", percent: 100 }
+      { name: "Beginner", percent: 0 },
+      { name: "Good Start", percent: 2 },
+      { name: "Moving Up", percent: 5 },
+      { name: "Good", percent: 8 },
+      { name: "Solid", percent: 15 },
+      { name: "Nice", percent: 25 },
+      { name: "Great", percent: 40 },
+      { name: "Amazing", percent: 50 },
+      { name: "Genius", percent: 70 },
+      { name: "Queen Bee", percent: 100 }
     ];
 
     function isPangram(word) {
-      const letters = new Set(word.split(""));
-      return [activePuzzle.center, ...activePuzzle.outer].every(l => letters.has(l));
+      return isPangramForLetters(word, activePuzzle.center, activePuzzle.outer);
+    }
+
+    function getWordPoints(word) {
+      const points = word.length === 4 ? 1 : word.length;
+      return points + (isPangram(word) ? 7 : 0);
+    }
+
+    function getScore(words) {
+      return Array.from(words).reduce((score, word) => score + getWordPoints(word), 0);
     }
 
     function getPossibleWords() {
       const allowedLetters = new Set([activePuzzle.center, ...activePuzzle.outer]);
       const possibleWords = new Set([...BASE_CORE_WORDS, ...activePuzzle.words]);
       return Array.from(possibleWords).filter(word =>
-        word.length >= 4 && word.includes(activePuzzle.center) &&
+        /^[A-Z]+$/.test(word) && word.length >= 4 && word.includes(activePuzzle.center) &&
+        !allowedLetters.has("S") &&
         Array.from(word).every(letter => allowedLetters.has(letter))
       );
     }
@@ -767,10 +820,9 @@
         if (saved) {
           const state = JSON.parse(saved);
           if (state.activePuzzle) {
-            if (state.activePuzzle.id?.startsWith("rnd-") &&
-                (state.activePuzzle.dictionaryVersion !== RANDOM_DICTIONARY_VERSION ||
-                 !Array.isArray(state.activePuzzle.words) ||
-                 state.activePuzzle.words.length < MIN_RANDOM_PUZZLE_WORDS)) {
+            if (!hasValidPuzzleRules(state.activePuzzle) ||
+                (state.activePuzzle.id?.startsWith("rnd-") &&
+                 state.activePuzzle.dictionaryVersion !== RANDOM_DICTIONARY_VERSION)) {
               resetToDailyPuzzle();
               return;
             }
@@ -918,9 +970,13 @@
       if (!entry || !Array.isArray(entry.tags) || !Array.isArray(entry.defs)) return false;
 
       const tags = entry.tags.map(tag => String(tag).toLowerCase());
-      const disallowedTags = new Set(["prop", "abbr", "acronym"]);
+      const disallowedTags = new Set([
+        "prop", "abbr", "abbrev", "acronym", "slang", "archaic", "obsolete",
+        "rare", "vulgar", "offensive", "profanity", "derogatory", "pejorative"
+      ]);
       const wordClasses = new Set(["n", "v", "adj", "adv", "u", "interj", "conj", "prep", "pron", "art", "det"]);
       return !tags.some(tag => disallowedTags.has(tag)) &&
+        /^[a-z]+$/i.test(word) &&
         tags.some(tag => wordClasses.has(tag)) &&
         entry.defs.some(definition => typeof definition === "string" && definition.trim().length > 0);
     }
@@ -957,6 +1013,7 @@
       currentInput = "";
       updateInputDisplay();
       if (!word) return;
+      if (!/^[A-Z]+$/.test(word)) { triggerShake(); showToast("Use letters from the hive"); return; }
       if (word.length < 4) { triggerShake(); showToast("Too short"); return; }
       if (!word.includes(activePuzzle.center)) { triggerShake(); showToast(`Missing center (${activePuzzle.center})`); return; }
 
@@ -966,6 +1023,8 @@
       }
       if (foundWords.has(word)) { triggerShake(); showToast("Already found"); return; }
 
+      const previousMaxScore = getScore(getPossibleWords());
+      const previousRank = getRankInfo(getScore(foundWords), previousMaxScore).currentTier;
       let isValid = isTrustedPuzzleWord(word);
       if (!isValid) {
         showToast("Checking dictionary...");
@@ -983,11 +1042,20 @@
       if (!isValid) { triggerShake(); showToast("Not in word list"); return; }
 
       foundWords.add(word);
-      if (isPangram(word)) {
-        showToast("PANGRAM!", true);
-        if (typeof confetti === "function") confetti({ particleCount: 80, spread: 65, origin: { y: 0.6 } });
-      } else {
-        showToast("Nice!", true);
+      const maxScore = getScore(getPossibleWords());
+      const { currentTier } = getRankInfo(getScore(foundWords), maxScore);
+      const reachedNewRank = RANK_TIERS.findIndex(tier => tier.name === currentTier.name) >
+        RANK_TIERS.findIndex(tier => tier.name === previousRank.name);
+      if (reachedNewRank) showToast(`You've reached ${currentTier.name}!`, true);
+      else if (isPangram(word)) showToast("PANGRAM!", true);
+      else showToast(`Nice! +${getWordPoints(word)} points`, true);
+
+      if (isPangram(word) && typeof confetti === "function") {
+        confetti({ particleCount: 80, spread: 65, origin: { y: 0.6 } });
+      }
+      if (currentTier.name === "Queen Bee" && previousRank.name !== "Queen Bee" &&
+          typeof confetti === "function") {
+        confetti({ particleCount: 180, spread: 100, startVelocity: 45, origin: { y: 0.55 } });
       }
       saveState();
       updateUI();
@@ -1103,17 +1171,17 @@
       }
     }
 
-    function getRankThreshold(tier, totalWords) {
+    function getRankThreshold(tier, maxScore) {
       if (tier.percent === 0) return 0;
-      if (totalWords <= 0) return Infinity;
-      return Math.ceil(tier.percent * totalWords / 100);
+      if (maxScore <= 0) return Infinity;
+      return maxScore * tier.percent / 100;
     }
 
-    function getRankInfo(wordsFound, totalWords) {
+    function getRankInfo(score, maxScore) {
       let currentTier = RANK_TIERS[0], nextTier = null;
-      if (totalWords <= 0) return { currentTier, nextTier };
+      if (maxScore <= 0) return { currentTier, nextTier };
       for (let i = 0; i < RANK_TIERS.length; i++) {
-        if (wordsFound >= getRankThreshold(RANK_TIERS[i], totalWords)) {
+        if (score >= getRankThreshold(RANK_TIERS[i], maxScore)) {
           currentTier = RANK_TIERS[i];
           nextTier = RANK_TIERS[i + 1] || null;
         }
@@ -1123,20 +1191,31 @@
 
     function updateUI() {
       updateInputDisplay();
-      const totalWords = getPossibleWords().length;
+      const possibleWords = getPossibleWords();
+      const totalWords = possibleWords.length;
       const wordsFound = foundWords.size;
+      const currentScore = getScore(foundWords);
+      const maxScore = getScore(possibleWords);
       document.getElementById("foundWordsCountLabel").textContent = wordsFound;
-      document.getElementById("maxWordsLabel").textContent = totalWords;
+      document.getElementById("maxScoreProgressLabel").textContent = maxScore;
       document.getElementById("possibleWordsLabel").textContent = totalWords;
-      const { currentTier, nextTier } = getRankInfo(wordsFound, totalWords);
+      document.getElementById("currentScoreLabel").textContent = currentScore;
+      document.getElementById("maxScoreLabel").textContent = maxScore;
+      const { currentTier, nextTier } = getRankInfo(currentScore, maxScore);
       document.getElementById("currentRankLabel").textContent = currentTier.name;
-      const wordsToNextTier = nextTier ? getRankThreshold(nextTier, totalWords) - wordsFound : 0;
+      document.getElementById("rankCrown").classList.toggle("visible", currentTier.name === "Queen Bee");
+      const pointsToNextTier = nextTier ? Math.max(0, Math.ceil(
+        getRankThreshold(nextTier, maxScore) - currentScore
+      )) : 0;
       document.getElementById("rankNextLabel").textContent = nextTier ?
-        `${wordsToNextTier} more word${wordsToNextTier === 1 ? "" : "s"} to ${nextTier.name}` :
-        totalWords > 0 ? "Genius achieved!" : "No valid words in this hive";
+        `${pointsToNextTier} more point${pointsToNextTier === 1 ? "" : "s"} to ${nextTier.name}` :
+        maxScore > 0 ? "Queen Bee achieved!" : "No valid words in this hive";
 
-      const progressPercent = totalWords > 0 ? (wordsFound / totalWords) * 100 : 0;
+      const progressPercent = maxScore > 0 ? (currentScore / maxScore) * 100 : 0;
       document.getElementById("progressFill").style.width = Math.min(100, Math.max(0, progressPercent)) + "%";
+      const scoreProgress = document.getElementById("scoreProgress");
+      scoreProgress.setAttribute("aria-valuemax", maxScore);
+      scoreProgress.setAttribute("aria-valuenow", Math.min(currentScore, maxScore));
 
       const milestonesContainer = document.getElementById("progressMilestones");
       milestonesContainer.innerHTML = "";
@@ -1144,7 +1223,7 @@
         const dot = document.createElement("div");
         dot.className = "milestone-dot";
         dot.style.left = tier.percent + "%";
-        if (wordsFound >= getRankThreshold(tier, totalWords)) dot.classList.add("active");
+        if (currentScore >= getRankThreshold(tier, maxScore)) dot.classList.add("active");
         milestonesContainer.appendChild(dot);
       });
 
@@ -1164,11 +1243,12 @@
     }
 
     function populateHintMatrix() {
-      const remaining = activePuzzle.words.filter(w => !foundWords.has(w));
+      const possibleWords = getPossibleWords();
+      const remaining = possibleWords.filter(w => !foundWords.has(w));
       document.getElementById("hintWordsLeft").textContent = remaining.length;
       document.getElementById("hintPangramsLeft").textContent = remaining.filter(w => isPangram(w)).length;
 
-      const lengths = Array.from(new Set(activePuzzle.words.map(w => w.length))).sort((a,b) => a - b);
+      const lengths = Array.from(new Set(possibleWords.map(w => w.length))).sort((a,b) => a - b);
       const letters = Array.from(new Set([activePuzzle.center, ...activePuzzle.outer])).sort();
       let tableHtml = `<tr><th></th>`;
       lengths.forEach(l => tableHtml += `<th>${l}</th>`);
@@ -1255,7 +1335,7 @@
       document.getElementById("newRandomGameBtn").addEventListener("click", async (event) => {
         const button = event.currentTarget;
         button.disabled = true;
-        showToast("Loading dictionary and finding a 150-word hive...");
+        showToast("Loading dictionary and finding a pangram...");
         try {
           const dictionaryEntries = await loadRandomDictionary();
           activePuzzle = generateFreshRandomPuzzle(dictionaryEntries);
@@ -1293,9 +1373,10 @@
       });
 
       document.getElementById("shareProgressBtn").addEventListener("click", () => {
-        const totalWords = getPossibleWords().length;
-        const { currentTier } = getRankInfo(foundWords.size, totalWords);
-        const text = `Spelling Bee 🐝\nRank: ${currentTier.name}\nWords: ${foundWords.size}/${totalWords}`;
+        const maxScore = getScore(getPossibleWords());
+        const currentScore = getScore(foundWords);
+        const { currentTier } = getRankInfo(currentScore, maxScore);
+        const text = `Spelling Bee 🐝\nRank: ${currentTier.name}\nScore: ${currentScore}/${maxScore}`;
         if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => showToast("Progress copied to clipboard!", true));
       });
 
